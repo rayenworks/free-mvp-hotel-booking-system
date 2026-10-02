@@ -1,5 +1,6 @@
 const Room = require("../models/room");
 const Booking = require("../models/booking");
+  const PRICES = require("../config/pricing");
 const { findAvailableRooms } = require("../utils/availability");
 
 exports.getRooms = async (req, res) => {
@@ -30,7 +31,20 @@ exports.getRoom = async (req, res) => {
 
 exports.createRoom = async (req, res) => {
     try {
-        const room = await Room.create(req.body);
+        const { roomNumber, floor, capacity, amenities } = req.body;
+
+        const price = PRICES[capacity];
+        if (!price) {
+            return res.status(400).json({ message: "capacity must be 2, 3, 4 or 5" });
+        }
+
+        const room = await Room.create({
+            roomNumber,
+            floor,
+            capacity,
+            amenities,
+            pricePerNight: price,
+        });
         res.status(201).json(room);
     } catch (err) {
         if (err.code === 11000) {
@@ -47,6 +61,16 @@ exports.createRoom = async (req, res) => {
 exports.updateRoom = async (req, res) => {
     try {
         delete req.body.blockedPeriods;
+        delete req.body.pricePerNight; // price always comes from the table
+
+        if (req.body.capacity !== undefined) {
+            const price = PRICES[req.body.capacity];
+            if (!price) {
+                return res.status(400).json({ message: "capacity must be 2, 3, 4 or 5" });
+            }
+            req.body.pricePerNight = price;
+        }
+
         const room = await Room.findByIdAndUpdate(req.params.id, req.body, {
             returnDocument: "after",
             runValidators: true,
