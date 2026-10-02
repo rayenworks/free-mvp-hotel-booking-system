@@ -19,6 +19,7 @@ Node.js, Express, MongoDB (Mongoose), JWT, bcrypt. Frontend in plain HTML/CSS/Ja
 ## Run locally
 
 email :you@example.com
+
 password:somethinglong123
 
 Customer site: `https://free-mvp-hotel-booking-system.onrender.com/`
