@@ -366,6 +366,7 @@
 
     // ADD / EDIT MODAL WORKFLOW
     function openAddRoomModal() {
+        roomModalSubmit.disabled = false;
         editingRoomId = null;
         roomModalTitle.textContent = "Add New Room";
         roomModalError.style.display = "none";
@@ -389,6 +390,7 @@
     }
 
     function openEditRoomModal(room) {
+         roomModalSubmit.disabled = false;
         editingRoomId = room._id;
         roomModalTitle.textContent = `Edit Room ${room.roomNumber}`;
         roomModalError.style.display = "none";
@@ -417,82 +419,77 @@
     }
 
     async function handleRoomFormSubmit(e) {
-        e.preventDefault();
-        roomModalError.style.display = "none";
-        roomModalErrorText.textContent = "";
+    e.preventDefault();
+    roomModalError.style.display = "none";
+    roomModalErrorText.textContent = "";
 
-        const roomNumber = roomNumberInput.value.trim();
-        const floor = Number(roomFloorSelect.value);
-        const capacity = Number(roomCapacitySelect.value);
-        
-        // Parse amenities from comma-separated string
-        const amenitiesRaw = roomAmenitiesInput.value;
-        const amenities = amenitiesRaw
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0);
+    const roomNumber = roomNumberInput.value.trim();
+    const floor = Number(roomFloorSelect.value);
+    const capacity = Number(roomCapacitySelect.value);
 
-        if (!roomNumber) {
-            roomModalErrorText.textContent = "Room number is required.";
-            roomModalError.style.display = "flex";
-            roomNumberInput.focus();
-            return;
-        }
+    const amenities = roomAmenitiesInput.value
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
 
-        // Capacity must be 2, 3, 4, or 5
-        if (![2, 3, 4, 5].includes(capacity)) {
-            roomModalErrorText.textContent = "Capacity must be 2, 3, 4, or 5.";
-            roomModalError.style.display = "flex";
-            return;
-        }
-
-        roomModalSubmit.disabled = true;
-        roomModalSubmit.textContent = "Saving...";
-
-        // NOTE: We NEVER send price! Price is calculated server-side.
-        const payload = {
-            roomNumber,
-            floor,
-            capacity,
-            amenities
-        };
-
-        try {
-            if (editingRoomId) {
-                // Update
-                const updated = await window.API.updateRoom(editingRoomId, payload);
-                closeRoomModal();
-                showToast(`Room ${updated.roomNumber || roomNumber} updated successfully!`, "success");
-                loadRooms();
-            } else {
-                // Create
-                const created = await window.API.createRoom(payload);
-                showToast(`Room ${created.roomNumber || roomNumber} added successfully! Price: ${formatPrice(created.pricePerNight)}`, "success");
-                
-                if (keepAddingCheckbox.checked) {
-                    // Fast add mode: clear room number, keep current floor selected
-                    roomNumberInput.value = "";
-                    roomModalError.style.display = "none";
-                    roomModalSubmit.disabled = false;
-                    roomModalSubmit.textContent = "Save Room";
-                    roomNumberInput.focus();
-                    loadRooms(); // refresh in background
-                } else {
-                    closeRoomModal();
-                    loadRooms();
-                }
-            }
-        } catch (err) {
-            // Handle 409 duplicate room number or 400 validation error
-            roomModalErrorText.textContent = err.message || "Failed to save room.";
-            roomModalError.style.display = "flex";
-            roomModalSubmit.disabled = false;
-            roomModalSubmit.textContent = editingRoomId ? "Update Room" : "Save Room";
-        }
+    if (!roomNumber) {
+        roomModalErrorText.textContent = "Room number is required.";
+        roomModalError.style.display = "flex";
+        roomNumberInput.focus();
+        return;
     }
+
+    if (![2, 3, 4, 5].includes(capacity)) {
+        roomModalErrorText.textContent = "Capacity must be 2, 3, 4, or 5.";
+        roomModalError.style.display = "flex";
+        return;
+    }
+
+    const roomId = editingRoomId; // save it BEFORE any close call
+    const isEdit = Boolean(roomId);
+
+    roomModalSubmit.disabled = true;
+    roomModalSubmit.textContent = "Saving...";
+
+    const payload = { roomNumber, floor, capacity, amenities };
+
+    try {
+        if (isEdit) {
+            const updated = await window.API.updateRoom(roomId, payload);
+            const idx = roomsCache.findIndex((r) => r._id === roomId);
+            if (idx !== -1 && updated) roomsCache[idx] = updated;
+            closeRoomModal();
+            renderFloors(roomsCache);
+            showToast(`Room ${updated.roomNumber || roomNumber} updated successfully!`, "success");
+        } else {
+            const created = await window.API.createRoom(payload);
+            if (created) {
+                roomsCache.push(created);
+                renderFloors(roomsCache);
+            }
+            showToast(`Room ${created.roomNumber || roomNumber} added successfully! Price: ${formatPrice(created.pricePerNight)}`, "success");
+
+            if (keepAddingCheckbox.checked) {
+                roomNumberInput.value = "";
+                roomNumberInput.focus();
+            } else {
+                closeRoomModal();
+            }
+        }
+        roomModalSubmit.disabled = false;
+        roomModalSubmit.textContent = isEdit ? "Update Room" : "Save Room";
+    } catch (err) {
+        roomModalErrorText.textContent = err.message || "Failed to save room.";
+        roomModalError.style.display = "flex";
+        roomModalSubmit.disabled = false;
+        roomModalSubmit.textContent = isEdit ? "Update Room" : "Save Room";
+    }
+}
 
     // BLOCK DATES WORKFLOW
     function openBlockModal(room) {
+        blockModalSubmit.disabled = false;
+        blockModalSubmit.textContent = "Confirm Block";
         activeBlockRoomId = room._id;
         blockModalTitle.textContent = `Block Dates for Room ${room.roomNumber}`;
         blockRoomInfo.textContent = `Room ${room.roomNumber} · Floor ${room.floor} · Capacity ${room.capacity}`;
@@ -525,45 +522,50 @@
     }
 
     async function handleBlockFormSubmit(e) {
-        e.preventDefault();
-        blockModalError.style.display = "none";
-        blockModalErrorText.textContent = "";
+    e.preventDefault();
+    blockModalError.style.display = "none";
+    blockModalErrorText.textContent = "";
 
-        const from = blockFromInput.value;
-        const to = blockToInput.value;
-        const reason = blockReasonInput.value.trim();
+    const from = blockFromInput.value;
+    const to = blockToInput.value;
+    const reason = blockReasonInput.value.trim();
 
-        if (!from || !to) {
-            blockModalErrorText.textContent = "Please select both from and to dates.";
-            blockModalError.style.display = "flex";
-            return;
-        }
-
-        if (to <= from) {
-            blockModalErrorText.textContent = "'To' date must be after 'From' date.";
-            blockModalError.style.display = "flex";
-            return;
-        }
-
-        blockModalSubmit.disabled = true;
-        blockModalSubmit.textContent = "Blocking...";
-
-        try {
-            await window.API.addBlock(activeBlockRoomId, { from, to, reason });
-            closeBlockModal();
-            showToast("Blackout period added successfully!", "success");
-            loadRooms();
-        } catch (err) {
-            // Handle 409 overlapping booking or 400 invalid dates
-            blockModalErrorText.textContent = err.message || "Failed to block dates.";
-            blockModalError.style.display = "flex";
-            blockModalSubmit.disabled = false;
-            blockModalSubmit.textContent = "Confirm Block";
-        }
+    if (!from || !to) {
+        blockModalErrorText.textContent = "Please select both from and to dates.";
+        blockModalError.style.display = "flex";
+        return;
     }
+
+    if (to <= from) {
+        blockModalErrorText.textContent = "'To' date must be after 'From' date.";
+        blockModalError.style.display = "flex";
+        return;
+    }
+
+    const roomId = activeBlockRoomId; // save it BEFORE closing
+
+    blockModalSubmit.disabled = true;
+    blockModalSubmit.textContent = "Blocking...";
+
+    try {
+        const updatedRoom = await window.API.addBlock(roomId, { from, to, reason });
+        const idx = roomsCache.findIndex((r) => r._id === roomId);
+        if (idx !== -1 && updatedRoom) roomsCache[idx] = updatedRoom;
+        closeBlockModal();
+        renderFloors(roomsCache);
+        showToast("Blackout period added successfully!", "success");
+    } catch (err) {
+        blockModalErrorText.textContent = err.message || "Failed to block dates.";
+        blockModalError.style.display = "flex";
+    } finally {
+        blockModalSubmit.disabled = false;
+        blockModalSubmit.textContent = "Confirm Block";
+    }
+}
 
     // REMOVE BLOCK WORKFLOW
     function promptRemoveBlock(room, block) {
+        deleteConfirmProceed.disabled = false;
         pendingDeleteAction = {
             type: "block",
             roomId: room._id,
@@ -586,6 +588,7 @@
 
     // DELETE ROOM WORKFLOW
     function promptDeleteRoom(room) {
+        deleteConfirmProceed.disabled = false; 
         pendingDeleteAction = {
             type: "room",
             roomId: room._id,
@@ -613,31 +616,46 @@
     }
 
     async function handleExecuteDelete() {
-        if (!pendingDeleteAction) return;
+    if (!pendingDeleteAction) return;
 
-        deleteConfirmProceed.disabled = true;
-        deleteConfirmProceed.textContent = "Deleting...";
+    const action = pendingDeleteAction; // local copy, survives the close call
+    const defaultLabel = action.type === "block" ? "Yes, Remove Block" : "Delete Room";
 
-        try {
-            if (pendingDeleteAction.type === "block") {
-                await window.API.removeBlock(pendingDeleteAction.roomId, pendingDeleteAction.blockId);
-                closeDeleteConfirmModal();
-                showToast("Blocked period removed.", "success");
-                loadRooms();
-            } else if (pendingDeleteAction.type === "room") {
-                await window.API.deleteRoom(pendingDeleteAction.roomId);
-                closeDeleteConfirmModal();
-                showToast(`${pendingDeleteAction.label} was deleted.`, "success");
-                loadRooms();
+    deleteConfirmProceed.disabled = true;
+    deleteConfirmProceed.textContent = "Deleting...";
+
+    try {
+        if (action.type === "block") {
+            const updatedRoom = await window.API.removeBlock(action.roomId, action.blockId);
+            const idx = roomsCache.findIndex((r) => r._id === action.roomId);
+            if (idx !== -1) {
+                if (updatedRoom && updatedRoom._id) {
+                    roomsCache[idx] = updatedRoom;
+                } else if (Array.isArray(roomsCache[idx].blockedPeriods)) {
+                    roomsCache[idx].blockedPeriods = roomsCache[idx].blockedPeriods.filter(
+                        (b) => b._id !== action.blockId
+                    );
+                }
             }
-        } catch (err) {
-            // Handle 409 (e.g. room has bookings and can't be deleted)
-            deleteConfirmErrorText.textContent = err.message || "Failed to complete deletion.";
-            deleteConfirmError.style.display = "flex";
-            deleteConfirmProceed.disabled = false;
-            deleteConfirmProceed.textContent = pendingDeleteAction.type === "block" ? "Yes, Remove Block" : "Delete Room";
+            closeDeleteConfirmModal();
+            renderFloors(roomsCache);
+            showToast("Blocked period removed.", "success");
+        } else {
+            await window.API.deleteRoom(action.roomId);
+            roomsCache = roomsCache.filter((r) => r._id !== action.roomId);
+            closeDeleteConfirmModal();
+            renderFloors(roomsCache);
+            showToast(`${action.label} was deleted.`, "success");
         }
+    } catch (err) {
+        // e.g. 409: room has bookings. Keep the modal open and show the message.
+        deleteConfirmErrorText.textContent = err.message || "Failed to complete deletion.";
+        deleteConfirmError.style.display = "flex";
+    } finally {
+        deleteConfirmProceed.disabled = false;
+        deleteConfirmProceed.textContent = defaultLabel;
     }
+}
 
     // Init on DOM ready
     if (document.readyState === "loading") {

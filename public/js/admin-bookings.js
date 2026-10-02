@@ -31,6 +31,7 @@
 
     // State
     let currentFilter = "all";
+    let bookingsCache = [];
     let pendingAction = null; // { bookingId, action: 'cancel' }
 
     function init() {
@@ -93,11 +94,20 @@
 
         try {
             const bookings = await window.API.getBookings(currentFilter);
-            renderBookings(bookings);
+            bookingsCache = Array.isArray(bookings) ? bookings : [];
+            renderBookings(bookingsCache);
         } catch (err) {
             renderError(err.message || "Failed to load bookings");
             showToast(err.message || "Failed to load bookings", "error");
         }
+    }
+
+    function renderFilteredBookings() {
+        let list = bookingsCache;
+        if (currentFilter && currentFilter !== "all") {
+            list = bookingsCache.filter((b) => (b.status || "").toLowerCase() === currentFilter);
+        }
+        renderBookings(list);
     }
 
     function renderLoading() {
@@ -369,17 +379,36 @@
         return card;
     }
 
-    async function handleConfirmBooking(bookingId) {
-        try {
-            await window.API.updateBookingStatus(bookingId, "confirmed");
-            showToast("Booking successfully confirmed!", "success");
-            loadBookings();
-        } catch (err) {
-            showToast(err.message || "Failed to confirm booking", "error");
+    const confirmingIds = new Set();
+
+async function handleConfirmBooking(bookingId) {
+    if (confirmingIds.has(bookingId)) return;
+    confirmingIds.add(bookingId);
+
+    try {
+        const updated = await window.API.updateBookingStatus(bookingId, "confirmed");
+        const idx = bookingsCache.findIndex((b) => b._id === bookingId);
+        if (idx !== -1) {
+            const currentRoom = bookingsCache[idx].room;
+            bookingsCache[idx] = {
+                ...bookingsCache[idx],
+                ...updated,
+                status: "confirmed",
+                room: (updated && updated.room && updated.room.roomNumber) ? updated.room : currentRoom
+            };
         }
+        renderFilteredBookings();
+        showToast("Booking successfully confirmed!", "success");
+    } catch (err) {
+        showToast(err.message || "Failed to confirm booking", "error");
+    } finally {
+        confirmingIds.delete(bookingId);
     }
+}
 
     function promptCancelBooking(booking) {
+        confirmModalProceedBtn.disabled = false;                       // ADD
+    confirmModalProceedBtn.textContent = "Yes, Cancel Booking";    
         pendingAction = {
             bookingId: booking._id,
             action: "cancel"
@@ -408,22 +437,37 @@
     }
 
     async function handleProceedAction() {
-        if (!pendingAction || pendingAction.action !== "cancel") return;
+    if (!pendingAction || pendingAction.action !== "cancel") return;
 
-        confirmModalProceedBtn.disabled = true;
-        confirmModalProceedBtn.textContent = "Processing...";
+    const bookingId = pendingAction.bookingId; // save before the modal closes
 
-        try {
-            await window.API.updateBookingStatus(pendingAction.bookingId, "cancelled");
-            closeConfirmModal();
-            showToast("Booking was cancelled.", "info");
-            loadBookings();
-        } catch (err) {
-            confirmModalProceedBtn.disabled = false;
-            confirmModalProceedBtn.textContent = "Yes, Cancel Booking";
-            showToast(err.message || "Failed to cancel booking", "error");
+    confirmModalProceedBtn.disabled = true;
+    confirmModalProceedBtn.textContent = "Processing...";
+
+    try {
+        const updated = await window.API.updateBookingStatus(bookingId, "cancelled");
+        const idx = bookingsCache.findIndex((b) => b._id === bookingId);
+        if (idx !== -1) {
+            const currentRoom = bookingsCache[idx].room;
+            bookingsCache[idx] = {
+                ...bookingsCache[idx],
+                ...updated,
+                status: "cancelled",
+                room: (updated && updated.room && updated.room.roomNumber) ? updated.room : currentRoom
+            };
         }
+        closeConfirmModal();
+        renderFilteredBookings();
+        showToast("Booking was cancelled.", "info");
+    } catch (err) {
+        confirmModalWarningText.textContent = err.message || "Failed to cancel booking";
+        confirmModalWarning.style.display = "flex";
+        showToast(err.message || "Failed to cancel booking", "error");
+    } finally {
+        confirmModalProceedBtn.disabled = false;
+        confirmModalProceedBtn.textContent = "Yes, Cancel Booking";
     }
+}
 
     // Init on DOM ready
     if (document.readyState === "loading") {

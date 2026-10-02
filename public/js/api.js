@@ -131,7 +131,7 @@
             if (status && status !== "all") {
                 endpoint += `?status=${encodeURIComponent(status)}`;
             }
-            return apiRequest(endpoint, { method: "GET" });
+            return apiRequest(endpoint, { method: "GET", cache: "no-store" });
         },
 
         updateBookingStatus(id, status) {
@@ -143,7 +143,7 @@
 
         // Rooms (Admin & Public read)
         getRooms() {
-            return apiRequest("/api/rooms", { method: "GET" });
+            return apiRequest("/api/rooms", { method: "GET", cache: "no-store" });
         },
 
         createRoom(roomData) {
