@@ -1,7 +1,7 @@
 [README.md](https://github.com/user-attachments/files/32978927/README.md)
 # Hotel Booking System
 
-Room booking system for a single hotel. Guests search by dates and party size and send a booking request without an account. One admin manages rooms and bookings, resell it take steal it whatever.
+Room booking system for a single hotel, resell it take steal it whatever.
 
 ## Features
 
@@ -10,11 +10,7 @@ Room booking system for a single hotel. Guests search by dates and party size an
 - Availability is re-checked on the server right before a booking is saved
 - Price is fixed per room type (capacity) and set on the server
 
-## Stack
-
-Node.js, Express, MongoDB (Mongoose), JWT, bcrypt. Frontend in plain HTML/CSS/JavaScript, served by Express from `public/`.
-
-## Run locally
+## LINKS AND PASSWORDS
 
 email :you@example.com
 
