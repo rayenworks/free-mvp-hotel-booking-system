@@ -21,8 +21,8 @@ Node.js, Express, MongoDB (Mongoose), JWT, bcrypt. Frontend in plain HTML/CSS/Ja
 email :you@example.com
 password:somethinglong123
 
-Customer site: `http://localhost:5000/`
-Admin: `http://localhost:5000/admin/login.html`
+Customer site: `https://free-mvp-hotel-booking-system.onrender.com/`
+Admin: `https://free-mvp-hotel-booking-system.onrender.com/admin/login.html`
 
 ## Known limitations
 
