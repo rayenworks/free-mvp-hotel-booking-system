@@ -22,7 +22,8 @@ email :you@example.com
 
 password:somethinglong123
 
-Customer site: `[website main page](https://free-mvp-hotel-booking-system.onrender.com/)`
+Customer site: <https://free-mvp-hotel-booking-system.onrender.com/>
+`
 Admin: `[admin link](https://free-mvp-hotel-booking-system.onrender.com/admin/login.html)`
 
 ## Known limitations
