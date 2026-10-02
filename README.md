@@ -1,9 +1,7 @@
 [README.md](https://github.com/user-attachments/files/32978927/README.md)
 # Hotel Booking System
 
-Room booking system for a single hotel. Guests search by dates and party size and send a booking request without an account. One admin manages rooms and bookings.
-
-**Live demo:** _add link here_ (free hosting, the first load may take up to a minute)
+Room booking system for a single hotel. Guests search by dates and party size and send a booking request without an account. One admin manages rooms and bookings, resell it take steal it whatever.
 
 ## Features
 
